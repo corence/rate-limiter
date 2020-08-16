@@ -1,0 +1,27 @@
+
+first questions to explore:
+ 1) what's a requester? is that an IP address?
+ 2) what's our data representation? (do we timestamp every single request that's made? is there a denial of service risk if we do this?)
+ 3) if a user is sending 1000 requests per hour, should we be servicing 100 of them each hour, or should all of them get a 429?
+ 4) should there be anything http-specific in this module? it doesn't seem so
+ 5) should we be periodically flushing out old requests to prevent build up of
+memory usage over time?
+ 6) should we hard cap memory usage to defend against someone spamming us with
+millions of addresses?
+
+What's coming up in these questions is that we're faced with a tradeoff here between precision versus memory usage. The number of requests per address, and the number of addresses making requests, could each be a source of excessive memory usage if we're not conscious of them.
+
+components to implement:
+ - the module itself, with no http-specific code in it, just the rate limiting logic
+ - unit tests for this module, focusing on unusual cases in the rate limiting
+ - a sample http client which listens to http requests and uses the module 
+
+thus, our examples to the questions above will be:
+ 1) a requester will be any string passed into the module. In our sample implementation, it'll be an IPv4 address, but we need to keep in mind that it should be compatible with IPv6 and other addressing schemes.
+ 2) data representation should be timestamp of last request received, and a count of received requests. this should give us near-perfect accuracy but with less memory consumed per requester.
+ 3) let's assume that for a client making 1000 requests per minute, we'll deny all of them until the request rate drops lower. But we'll make sure this assumption is easy to change.
+ 4) the module will have nothing http-specific in it.
+ 5) we should absolutely be flushing out old requests so that we don't retain addresses that haven't made a request for years. Not sure how we'll implement this so we'll make that decision as implementation progresses.
+ 6) capping our memory usage would be sensible -- if we're getting a much
+higher volume of requests than we could otherwise handle then it's
+
