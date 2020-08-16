@@ -1,9 +1,10 @@
 
 class RateLimiter {
-  constructor(maxHitsPerHour, countBlockedHits) {
+  constructor(maxHitsPerHour, countBlockedHits, nowFunction) {
     this.maxHitsPerHour = maxHitsPerHour;
     this.countBlockedHits = countBlockedHits;
     this.hitCounts = new Map();
+    this.nowFunction = nowFunction;
   }
 
   // number of seconds between "acceptable" requests
@@ -17,7 +18,7 @@ class RateLimiter {
 
   recordHit(address) {
     // find the existing hit time and count for this address
-    const now = Date.now();
+    const now = this.nowFunction();
     const existingRecord = this.hitCounts.get(address);
 
     if(existingRecord) {

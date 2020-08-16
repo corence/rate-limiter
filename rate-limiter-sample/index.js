@@ -3,7 +3,7 @@ const RateLimiter = require('rate-limiter').RateLimiter;
 
 const hostname = '127.0.0.1';
 const port = 3000;
-const rateLimiter = new RateLimiter(100, true);
+const rateLimiter = new RateLimiter(100, true, Date.now);
 
 const server = http.createServer((req, res) => {
   res.statusCode = 200;
