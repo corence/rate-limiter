@@ -11,6 +11,10 @@ class RateLimiter {
     return 3600 / maxHitsPerHour;
   }
 
+  queryAddress(address) {
+    return this.hitCounts.get(address);
+  }
+
   recordHit(address) {
     // find the existing hit time and count for this address
     const now = Date.now();
@@ -22,7 +26,7 @@ class RateLimiter {
       const expiredHits = elapsedTime / this.interval();
       const newHitCount = Math.max(0, existingRecord.hitCount - expiredHits);
 
-      this.hitCounts.put(address, { lastHitTime: now, hitCount: newHitCount });
+      this.hitCounts.set(address, { lastHitTime: now, hitCount: newHitCount });
 
       // if it's too high, return a failure indicating the number of seconds before the next request will be accepted
       if(newHitCount > this.maxHitsPerHour) {
@@ -32,7 +36,7 @@ class RateLimiter {
         return null;
       }
     } else {
-      this.hitCounts.put(address, { lastHitTime: now, hitCount: 1 });
+      this.hitCounts.set(address, { lastHitTime: now, hitCount: 1 });
       return null;
     }
   }
