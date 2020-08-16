@@ -1,0 +1,11 @@
+{
+  "name": "rate-limiter",
+  "version": "0.1.0",
+  "description": "limits incoming requests on a per-user basis",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Jessica Knight",
+  "license": "ISC"
+}
