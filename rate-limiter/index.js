@@ -1,44 +1,50 @@
 
+// A class to record hits and advise whether a client should be rate limited.
+// Each client is identified by an "address", which is any valid hashmap key.
+//
 class RateLimiter {
-  constructor(maxHitsPerHour, countBlockedHits, nowFunction) {
+  constructor(maxHitsPerHour, countBlockedHits) {
     this.maxHitsPerHour = maxHitsPerHour;
     this.countBlockedHits = countBlockedHits;
     this.hitCounts = new Map();
-    this.nowFunction = nowFunction;
   }
 
   // number of seconds between "acceptable" requests
   interval() {
-    return 3600 / maxHitsPerHour;
+    return 3600 / this.maxHitsPerHour;
   }
 
+  // this is a testing method that I'll probably remove, because it gives the caller mutable access to internals
   queryAddress(address) {
     return this.hitCounts.get(address);
   }
 
-  recordHit(address) {
+  // Get the number of seconds the given address will be blocked
+  // If it's not blocked, this returns 0
+  getBlockTime(address, time) {
+    const record = this.hitCounts.get(address);
+
+    if(record) {
+      return Math.max(0, record.hitCount - this.maxHitsPerHour) * this.interval();
+    } else {
+      return 0;
+    }
+  }
+
+  // Record a hit against the given address at the given time
+  recordHit(address, hitTime) {
     // find the existing hit time and count for this address
-    const now = this.nowFunction();
     const existingRecord = this.hitCounts.get(address);
 
     if(existingRecord) {
       // decrease the recorded hit count based on elapsed time
-      const elapsedTime = now - existingRecord.lastHitTime;
+      const elapsedTime = hitTime - existingRecord.lastHitTime;
       const expiredHits = elapsedTime / this.interval();
       const newHitCount = Math.max(0, existingRecord.hitCount - expiredHits);
 
-      this.hitCounts.set(address, { lastHitTime: now, hitCount: newHitCount });
-
-      // if it's too high, return a failure indicating the number of seconds before the next request will be accepted
-      if(newHitCount > this.maxHitsPerHour) {
-        const blockedSecondsRemaining = (newHitCount - this.maxHitsPerHour) * this.interval();
-        return blockedSecondsRemaining;
-      } else {
-        return null;
-      }
+      this.hitCounts.set(address, { lastHitTime: hitTime, hitCount: newHitCount });
     } else {
-      this.hitCounts.set(address, { lastHitTime: now, hitCount: 1 });
-      return null;
+      this.hitCounts.set(address, { lastHitTime: hitTime, hitCount: 1 });
     }
   }
 }
