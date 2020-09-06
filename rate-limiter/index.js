@@ -40,7 +40,7 @@ class RateLimiter {
       // decrease the recorded hit count based on elapsed time
       const elapsedTime = hitTime - existingRecord.lastHitTime;
       const expiredHits = elapsedTime / this.interval();
-      const newHitCount = Math.max(0, existingRecord.hitCount - expiredHits);
+      const newHitCount = Math.max(1, 1 + existingRecord.hitCount - expiredHits);
 
       this.hitCounts.set(address, { lastHitTime: hitTime, hitCount: newHitCount });
     } else {
