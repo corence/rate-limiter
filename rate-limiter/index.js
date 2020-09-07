@@ -21,21 +21,21 @@ class RateLimiter {
   // Constructor arguments:
   //   hitsPerPeriod: the maximum number of hits that will be tolerated within each period.
   //     If a client exceeds this many hits per period, they'll eventually start being blocked.
-  //   period: the time period, in seconds, in which the "hitsPerPeriod" is considered tolerable.
+  //   period: the time period, in milliseconds, in which the "hitsPerPeriod" is considered tolerable.
   // Samples:
-  //   new RateLimiter(100, 3600);
+  //   new RateLimiter(100, 3600 * 1000);
   //   This constructs a RateLimiter which restricts each client to 100 hits per hour.
   //   A client who sends 200 hits per hour will exceed the acceptable hit rate (and start being blocked) after half an hour.
   //   If that client immediately stops sending traffic, their ability to send hits will resume; their recorded hits will be fully cleared after one hour.
   //
-  //   new RateLimiter(10, 360);
+  //   new RateLimiter(10, 360 * 1000);
   //   This takes hits at the same rate as the previous rate limiter, but it has a lower threshold before it starts blocking, so it's more aggressive.
   //   If a user sends over 10 packets in any six minute timespan, they'll trigger a block. The above rate limiter wouldn't do so.
   //
   //   new RateLimiter(1, 10);
-  //   This RateLimiter restricts its clients to one request per second.
+  //   This RateLimiter restricts its clients to one request per 10 milliseconds.
   //   If they send less than this, they'll never be blocked.
-  //   If they send 100 hits in the first 10 seconds, most of them will be blocked, and they'd need to wait 90 seconds before their hits stop being ignored.
+  //   If they send 100 hits in the first 10 milliseconds, most of them will be blocked, and they'd need to wait 90 milliseconds before their hits stop being ignored.
   constructor(hitsPerPeriod, period) {
     this.interval = period / hitsPerPeriod; // the maximum timespan between hits before the client risks getting blocked
     this.period = period; // the time that must elapse for their recorded hits to fully dissipate
@@ -52,7 +52,7 @@ class RateLimiter {
     return this.addressesToClearTimes.get(address);
   }
 
-  // Get the number of seconds the given address will be blocked from the given timestamp
+  // Get the number of milliseconds the given address will be blocked from the given timestamp
   // If the address will not blocked at that timestamp, this returns 0
   getBlockTimeRemaining(address, time) {
     const clearTime = this.getClearTime(address);

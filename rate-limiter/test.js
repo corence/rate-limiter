@@ -6,7 +6,7 @@ const RateLimiter = require('./index').RateLimiter;
 // In real-world usage we'd probably be providing epoch timestamps (such as Date.now()) in place of these.
 describe('rate limiter tests', () => {
   it('should record one hit', () => {
-    const rateLimiter = new RateLimiter(2, 10); // 5 seconds between hits
+    const rateLimiter = new RateLimiter(2, 10); // 5 ms between hits
     rateLimiter.recordHit('abc', 3);
     expect(rateLimiter.getClearTime('abc')).to.equal(8);
   });
