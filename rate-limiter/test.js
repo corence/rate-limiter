@@ -72,4 +72,29 @@ describe('rate limiter tests', () => {
 
     expect(rateLimiter.getBlockTimeRemaining('abc', 6)).to.equal(15);
   });
+
+  it('should expire records that are so old they cannot affect the results anymore', () => {
+    const rateLimiter = new RateLimiter(2, 10);
+    // it's important for us to test this with multiple addresses sharing a timestamp, because our multimap data structure is probably needed here to prevent lost records
+
+    rateLimiter.recordHit('early bird', 1);
+    rateLimiter.recordHit('partner in crime', 1);
+    rateLimiter.recordHit('early bird', 2);
+    rateLimiter.recordHit('partner in crime', 2);
+    rateLimiter.recordHit('latecomer', 8);
+    rateLimiter.recordHit('latecomer', 9);
+
+    expect(rateLimiter.getClearTime('early bird')).to.equal(11);
+    expect(rateLimiter.getClearTime('partner in crime')).to.equal(11);
+    expect(rateLimiter.getClearTime('latecomer')).to.equal(18);
+
+    rateLimiter.expireHits(10);
+    expect(rateLimiter.countTrackedAddresses()).to.deep.equal([3, 3]);
+
+    rateLimiter.expireHits(12);
+    expect(rateLimiter.countTrackedAddresses()).to.deep.equal([1, 1]);
+
+    rateLimiter.expireHits(19);
+    expect(rateLimiter.countTrackedAddresses()).to.deep.equal([0, 0]);
+  });
 });

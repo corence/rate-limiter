@@ -82,6 +82,17 @@ class RateLimiter {
     this.addressesToClearTimes.set(address, newClearTime);
     this.clearTimesToAddresses.insertMulti(newClearTime, address);
   }
+
+  // At the given timestamp, erase all records whose clear time is in the past
+  expireHits(time) {
+    const end = this.clearTimesToAddresses.upperBound(time);
+    let it = this.clearTimesToAddresses.begin();
+    while(!it.equals(end)) {
+      this.addressesToClearTimes.delete(it.value);
+      this.clearTimesToAddresses.erase(it);
+      it = this.clearTimesToAddresses.begin(); // this is a weird way to iterate a TreeMap but it works, I guess
+    }
+  }
 }
 
 module.exports = {
