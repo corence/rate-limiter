@@ -90,14 +90,25 @@ class RateLimiter {
   }
 
   // At the given timestamp, erase all records whose clear time is in the past
+  // Intended usage: this is generally useful to call just before each call to recordHit.
+  // This amortizes the cost of the operation.
+  // Worst-case time of this operation could be O(n * log(n)) where n is the number of entries expiring at once, but that would be a strange and degenerate case and it may be quite difficult for a hostile user to craft an attack based on this.
   expireHits(time) {
+    let numResults = 0;
     const end = this.clearTimesToAddresses.upperBound(time);
     let it = this.clearTimesToAddresses.begin();
     while(!it.equals(end)) {
-      this.addressesToClearTimes.delete(it.value);
+      const address = it.value;
+      this.addressesToClearTimes.delete(address);
       this.clearTimesToAddresses.erase(it);
-      it = this.clearTimesToAddresses.begin(); // this is a weird way to iterate a TreeMap but it works, I guess
+      it = this.clearTimesToAddresses.begin();
+      ++numResults;
+      // TODO: I couldn't find a way with this TreeMultiMap to erase an element and also advance the iterator to the following element.
+      // We should be calling it.next(), but I couldn't figure out how, so we're calling it.begin().
+      // This might be a mild performance issue but I guess it has the same hypothetical O(log(n)), and it's a red/black tree so
+      // it's all going to be cache misses anyway.
     }
+    return numResults;
   }
 
   // Expire the address which will clear soonest.
@@ -105,8 +116,10 @@ class RateLimiter {
   expireOneHit() {
     if(this.clearTimesToAddresses.size > 0) {
       const it = this.clearTimesToAddresses.begin();
-      this.addressesToClearTimes.delete(it.value);
+      const address = it.value;
+      this.addressesToClearTimes.delete(address);
       this.clearTimesToAddresses.erase(it);
+      return address;
     }
   }
 }

@@ -124,6 +124,15 @@ describe('rate limiter tests', () => {
   });
 
   describe('expireOneHit', () => {
+    it('should not cause problems when called on an empty rateLimiter', () => {
+      const rateLimiter = new RateLimiter(2, 10);
+      expect(rateLimiter.debugCountTrackedAddresses()).to.deep.equal([0, 0]);
+
+      const result = rateLimiter.expireOneHit();
+      expect(result).to.be.undefined;
+      expect(rateLimiter.debugCountTrackedAddresses()).to.deep.equal([0, 0]);
+    });
+
     it('should erase the record that will expire soonest', () => {
       const rateLimiter = new RateLimiter(2, 10);
       rateLimiter.recordHit('first', 1);
@@ -134,20 +143,23 @@ describe('rate limiter tests', () => {
       expect(rateLimiter.getClearTime('second')).to.equal(7);
       expect(rateLimiter.getClearTime('third')).to.equal(8);
 
-      rateLimiter.expireOneHit();
+      let result = rateLimiter.expireOneHit();
 
+      expect(result).to.equal('first');
       expect(rateLimiter.getClearTime('first')).to.be.undefined;
       expect(rateLimiter.getClearTime('second')).to.equal(7);
       expect(rateLimiter.getClearTime('third')).to.equal(8);
 
-      rateLimiter.expireOneHit();
+      result = rateLimiter.expireOneHit();
 
+      expect(result).to.equal('second');
       expect(rateLimiter.getClearTime('first')).to.be.undefined;
       expect(rateLimiter.getClearTime('second')).to.be.undefined;
       expect(rateLimiter.getClearTime('third')).to.equal(8);
 
-      rateLimiter.expireOneHit();
+      result = rateLimiter.expireOneHit();
 
+      expect(result).to.equal('third');
       expect(rateLimiter.getClearTime('first')).to.be.undefined;
       expect(rateLimiter.getClearTime('second')).to.be.undefined;
       expect(rateLimiter.getClearTime('third')).to.be.undefined;
