@@ -64,9 +64,14 @@ class RateLimiter {
     }
   }
 
+  // Get the number of tracked addresses.
+  countTrackedAddresses() {
+    return this.addressesToClearTimes.size;
+  }
+
   // Get the number of tracked addresses as a 2-element array. The two values should always be identical.
   // This method is not expected to be useful except when testing this module.
-  countTrackedAddresses() {
+  debugCountTrackedAddresses() {
     return [this.addressesToClearTimes.size, this.clearTimesToAddresses.size];
   }
 
@@ -92,6 +97,16 @@ class RateLimiter {
       this.addressesToClearTimes.delete(it.value);
       this.clearTimesToAddresses.erase(it);
       it = this.clearTimesToAddresses.begin(); // this is a weird way to iterate a TreeMap but it works, I guess
+    }
+  }
+
+  // Expire the address which will clear soonest.
+  // This can be useful if the rate limiter must run with a hard limit of memory usage.
+  expireOneHit() {
+    if(this.clearTimesToAddresses.size > 0) {
+      const it = this.clearTimesToAddresses.begin();
+      this.addressesToClearTimes.delete(it.value);
+      this.clearTimesToAddresses.erase(it);
     }
   }
 }
