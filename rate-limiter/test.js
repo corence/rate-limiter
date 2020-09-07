@@ -97,4 +97,29 @@ describe('rate limiter tests', () => {
     rateLimiter.expireHits(19);
     expect(rateLimiter.countTrackedAddresses()).to.deep.equal([0, 0]);
   });
+
+  it('should keep its data structure sizes in sync, in the presence of identical timestamps', () => {
+    // I noticed a bug in the tree multimap code so I realized we really need tests around it because the edge cases are obscure and perilous
+
+    const rateLimiter = new RateLimiter(2, 10);
+    expect(rateLimiter.countTrackedAddresses()).to.deep.equal([0, 0]);
+
+    rateLimiter.recordHit('first', 1);
+    expect(rateLimiter.countTrackedAddresses()).to.deep.equal([1, 1]);
+
+    rateLimiter.recordHit('second', 1);
+    expect(rateLimiter.countTrackedAddresses()).to.deep.equal([2, 2]);
+
+    rateLimiter.recordHit('third', 1);
+    expect(rateLimiter.countTrackedAddresses()).to.deep.equal([3, 3]);
+
+    rateLimiter.recordHit('third', 2);
+    expect(rateLimiter.countTrackedAddresses()).to.deep.equal([3, 3]);
+
+    rateLimiter.recordHit('first', 2);
+    expect(rateLimiter.countTrackedAddresses()).to.deep.equal([3, 3]);
+
+    rateLimiter.recordHit('second', 2);
+    expect(rateLimiter.countTrackedAddresses()).to.deep.equal([3, 3]);
+  });
 });

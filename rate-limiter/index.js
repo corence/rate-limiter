@@ -11,6 +11,7 @@ function treeMultiMapErase(collection, key, value) {
       collection.erase(it);
       break;
     }
+    it.next();
   }
 }
 
