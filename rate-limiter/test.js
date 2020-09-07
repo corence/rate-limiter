@@ -2,62 +2,74 @@
 const expect = require('chai').expect;
 const RateLimiter = require('./index').RateLimiter;
 
+// Note that for a lot of these unit tests, we're providing absolute times (1, 2, 3).
+// In real-world usage we'd probably be providing epoch timestamps (such as Date.now()) in place of these.
 describe('rate limiter tests', () => {
-  describe('test single hit', () => {
-    it('should record one hit', () => {
-      const rateLimiter = new RateLimiter(2, true);
-      rateLimiter.recordHit('abc', Date.now());
-      expect(rateLimiter.queryAddress('abc').hitCount).to.equal(1);
-    });
+  it('should record one hit', () => {
+    const rateLimiter = new RateLimiter(2, 10); // 5 seconds between hits
+    rateLimiter.recordHit('abc', 3);
+    expect(rateLimiter.getClearTime('abc')).to.equal(8);
   });
-  describe('multi-user tests', () => {
-    it('should return 0 block time for an unrecognized user', () => {
-      const rateLimiter = new RateLimiter(2, true);
-      expect(rateLimiter.getBlockTime('untracked user')).to.equal(0);
-    });
 
-    it('should only block the high-traffic user', () => {
-      const rateLimiter = new RateLimiter(2, true);
-      rateLimiter.recordHit('too chatty', 1);
-      rateLimiter.recordHit('too chatty', 2);
-      rateLimiter.recordHit('too chatty', 3);
-      rateLimiter.recordHit('well-behaved', 4);
-      rateLimiter.recordHit('well-behaved', 5);
-      expect(rateLimiter.getBlockTime('too chatty')).to.be.greaterThan(0);
-      expect(rateLimiter.getBlockTime('well-behaved')).to.equal(0);
-      expect(rateLimiter.getBlockTime('silent')).to.equal(0);
-    });
+  it('should return 0 block time for an unrecognized user', () => {
+    const rateLimiter = new RateLimiter(2, 10);
+    expect(rateLimiter.getBlockTimeRemaining('untracked user', 1)).to.equal(0);
   });
-  describe('scenarios', () => {
-    it('should unblock if we wait out the rest of the period before sending more', () => {
-      const rateLimiter = new RateLimiter(2, true);
-      rateLimiter.recordHit('abc', 1);
-      rateLimiter.recordHit('abc', 2);
-      rateLimiter.recordHit('abc', 3);
-      expect(rateLimiter.getBlockTime('abc')).to.be.greaterThan(0);
-      rateLimiter.recordHit('abc', 3601);
-      expect(rateLimiter.getBlockTime('abc')).to.equal(0);
-    });
 
-    it('should stay blocked if not quite time has elapsed to unblock', () => {
-      const rateLimiter = new RateLimiter(2, true);
-      rateLimiter.recordHit('abc', 1);
-      rateLimiter.recordHit('abc', 2);
-      rateLimiter.recordHit('abc', 3);
-      expect(rateLimiter.getBlockTime('abc')).to.be.greaterThan(0);
-      rateLimiter.recordHit('abc', 3599);
-      expect(rateLimiter.getBlockTime('abc')).to.be.greaterThan(0);
-    });
+  it('should block a high-traffic user, while allowing the quieter user to proceed', () => {
+    const rateLimiter = new RateLimiter(2, 10);
+    rateLimiter.recordHit('too chatty', 1);
+    rateLimiter.recordHit('well-behaved', 1);
+    rateLimiter.recordHit('too chatty', 2);
+    rateLimiter.recordHit('too chatty', 3);
+    rateLimiter.recordHit('well-behaved', 3);
+    rateLimiter.recordHit('too chatty', 4);
 
-    it('should start blocking when a stream of hits flows in', () => {
-      const rateLimiter = new RateLimiter(2, true);
-      rateLimiter.recordHit('abc', 1);
-      rateLimiter.recordHit('abc', 2);
-      expect(rateLimiter.getBlockTime('abc')).to.equal(0);
+    expect(rateLimiter.getClearTime('too chatty')).to.equal(21);
+    expect(rateLimiter.getBlockTimeRemaining('too chatty', 5)).to.equal(6);
 
-      // after one more hit, it should fail because we've exceeded 2 hits per hour
-      rateLimiter.recordHit('abc', 3);
-      expect(rateLimiter.getBlockTime('abc')).to.be.greaterThan(0);
-    });
+    expect(rateLimiter.getClearTime('well-behaved')).to.equal(11);
+    expect(rateLimiter.getBlockTimeRemaining('well-behaved', 5)).to.equal(0);
+  });
+
+  it('should unblock a high-traffic user once they have calmed down', () => {
+    const rateLimiter = new RateLimiter(2, 10);
+    rateLimiter.recordHit('abc', 1);
+    rateLimiter.recordHit('abc', 2);
+    rateLimiter.recordHit('abc', 3);
+    rateLimiter.recordHit('abc', 4);
+    rateLimiter.recordHit('abc', 5);
+    rateLimiter.recordHit('abc', 6);
+
+    expect(rateLimiter.getBlockTimeRemaining('abc', 5)).to.equal(16);
+    expect(rateLimiter.getBlockTimeRemaining('abc', 5 + 15)).to.equal(1);
+    expect(rateLimiter.getBlockTimeRemaining('abc', 5 + 16)).to.equal(0);
+    expect(rateLimiter.getBlockTimeRemaining('abc', 5 + 17)).to.equal(0);
+  });
+
+  it('should ignore previous recorded hits if they were so long ago that they could be cleared away', () => {
+    const rateLimiter = new RateLimiter(2, 10);
+    rateLimiter.recordHit('abc', 1);
+    rateLimiter.recordHit('abc', 2);
+    rateLimiter.recordHit('abc', 3);
+    rateLimiter.recordHit('abc', 4);
+    rateLimiter.recordHit('abc', 5);
+    rateLimiter.recordHit('abc', 6);
+    rateLimiter.recordHit('abc', 65);
+
+    expect(rateLimiter.getBlockTimeRemaining('abc', 65)).to.equal(0);
+    expect(rateLimiter.getClearTime('abc')).to.equal(70);
+  });
+
+  it('should block for a multiple of the period if the user floods us with hits', () => {
+    const rateLimiter = new RateLimiter(2, 10);
+    rateLimiter.recordHit('abc', 1);
+    rateLimiter.recordHit('abc', 2);
+    rateLimiter.recordHit('abc', 3);
+    rateLimiter.recordHit('abc', 4);
+    rateLimiter.recordHit('abc', 5);
+    rateLimiter.recordHit('abc', 6);
+
+    expect(rateLimiter.getBlockTimeRemaining('abc', 6)).to.equal(15);
   });
 });
