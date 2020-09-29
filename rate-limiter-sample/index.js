@@ -3,7 +3,7 @@ const RateLimiter = require('../rate-limiter').RateLimiter;
 
 const hostname = '127.0.0.1';
 const port = 3000;
-const rateLimiter = new RateLimiter(100, 3600 * 1000);
+const rateLimiter = new RateLimiter(3, 10 * 1000, false);
 
 const server = http.createServer((req, res) => {
   // This should get the IP address of the requester. It's grabbed from StackOverflow and might not work in all situations!

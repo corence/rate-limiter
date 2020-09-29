@@ -19,6 +19,7 @@ function treeMultiMapErase(collection, key, value) {
 // Each client is identified by an "address", which is any valid hashmap key.
 class RateLimiter {
   // Constructor arguments:
+	//  TODO: docs
   //   hitsPerPeriod: the maximum number of hits that will be tolerated within each period.
   //     If a client exceeds this many hits per period, they'll eventually start being blocked.
   //   period: the time period, in milliseconds, in which the "hitsPerPeriod" is considered tolerable.
@@ -36,9 +37,10 @@ class RateLimiter {
   //   This RateLimiter restricts its clients to one request per 10 milliseconds.
   //   If they send less than this, they'll never be blocked.
   //   If they send 100 hits in the first 10 milliseconds, most of them will be blocked, and they'd need to wait 90 milliseconds before their hits stop being ignored.
-  constructor(hitsPerPeriod, period) {
+  constructor(hitsPerPeriod, periodInSeconds, countBlockedHits) {
     this.interval = period / hitsPerPeriod; // the maximum timespan between hits before the client risks getting blocked
     this.period = period; // the time that must elapse for their recorded hits to fully dissipate
+    this.countBlockedHits = countBlockedHits;
     
     // This tracks the "clear time" for each address. That is the time when all recorded activity by the address will dissipate to zero.
     this.addressesToClearTimes = new Map();
@@ -79,25 +81,31 @@ class RateLimiter {
   recordHit(address, hitTime) {
     const clearTime = this.addressesToClearTimes.get(address);
 
-    let newClearTime = hitTime + this.interval;
-    if(clearTime) {
-      treeMultiMapErase(this.clearTimesToAddresses, clearTime, address);
-      newClearTime = Math.max(hitTime, clearTime) + this.interval;
-    }
+    if(this.countBlockedHits || this.getBlockTimeRemaining(address, hitTime) <= 0) {
+        let newClearTime = hitTime + this.interval;
+        if(clearTime) {
+          treeMultiMapErase(this.clearTimesToAddresses, clearTime, address);
+          newClearTime = Math.max(hitTime, clearTime) + this.interval;
+        }
 
-    this.addressesToClearTimes.set(address, newClearTime);
-    this.clearTimesToAddresses.insertMulti(newClearTime, address);
+        this.addressesToClearTimes.set(address, newClearTime);
+        this.clearTimesToAddresses.insertMulti(newClearTime, address);
+    }
   }
 
   // At the given timestamp, erase all records whose clear time is in the past
   // Intended usage: this is generally useful to call just before each call to recordHit.
   // This amortizes the cost of the operation.
   // Worst-case time of this operation could be O(n * log(n)) where n is the number of entries expiring at once, but that would be a strange and degenerate case and it may be quite difficult for a hostile user to craft an attack based on this.
-  expireHits(time) {
+  expireHits(time, maxNumberExpired) {
     let numResults = 0;
     const end = this.clearTimesToAddresses.upperBound(time);
     let it = this.clearTimesToAddresses.begin();
     while(!it.equals(end)) {
+      if (--maxNumberExpired <= 0) {
+          break;
+      }
+
       const address = it.value;
       this.addressesToClearTimes.delete(address);
       this.clearTimesToAddresses.erase(it);
