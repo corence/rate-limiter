@@ -6,18 +6,18 @@ const RateLimiter = require('./index').RateLimiter;
 // In real-world usage we'd probably be providing epoch timestamps (such as Date.now()) in place of these.
 describe('rate limiter tests', () => {
   it('should record one hit', () => {
-    const rateLimiter = new RateLimiter(2, 10); // 5 ms between hits
+    const rateLimiter = new RateLimiter(2, 10, true); // 5 ms between hits
     rateLimiter.recordHit('abc', 3);
     expect(rateLimiter.getClearTime('abc')).to.equal(8);
   });
 
   it('should return 0 block time for an unrecognized user', () => {
-    const rateLimiter = new RateLimiter(2, 10);
+    const rateLimiter = new RateLimiter(2, 10, true);
     expect(rateLimiter.getBlockTimeRemaining('untracked user', 1)).to.equal(0);
   });
 
   it('should block a high-traffic user, while allowing the quieter user to proceed', () => {
-    const rateLimiter = new RateLimiter(2, 10);
+    const rateLimiter = new RateLimiter(2, 10, true);
     rateLimiter.recordHit('too chatty', 1);
     rateLimiter.recordHit('well-behaved', 1);
     rateLimiter.recordHit('too chatty', 2);
@@ -33,7 +33,7 @@ describe('rate limiter tests', () => {
   });
 
   it('should unblock a high-traffic user once they have calmed down', () => {
-    const rateLimiter = new RateLimiter(2, 10);
+    const rateLimiter = new RateLimiter(2, 10, true);
     rateLimiter.recordHit('abc', 1);
     rateLimiter.recordHit('abc', 2);
     rateLimiter.recordHit('abc', 3);
@@ -48,7 +48,7 @@ describe('rate limiter tests', () => {
   });
 
   it('should ignore previous recorded hits if they were so long ago that they could be cleared away', () => {
-    const rateLimiter = new RateLimiter(2, 10);
+    const rateLimiter = new RateLimiter(2, 10, true);
     rateLimiter.recordHit('abc', 1);
     rateLimiter.recordHit('abc', 2);
     rateLimiter.recordHit('abc', 3);
@@ -62,7 +62,7 @@ describe('rate limiter tests', () => {
   });
 
   it('should block for a multiple of the period if the user floods us with hits', () => {
-    const rateLimiter = new RateLimiter(2, 10);
+    const rateLimiter = new RateLimiter(2, 10, true);
     rateLimiter.recordHit('abc', 1);
     rateLimiter.recordHit('abc', 2);
     rateLimiter.recordHit('abc', 3);
@@ -74,7 +74,7 @@ describe('rate limiter tests', () => {
   });
 
   it('should expire records that are so old they cannot affect the results anymore', () => {
-    const rateLimiter = new RateLimiter(2, 10);
+    const rateLimiter = new RateLimiter(2, 10, true);
     // it's important for us to test this with multiple addresses sharing a timestamp, because our multimap data structure is probably needed here to prevent lost records
 
     rateLimiter.recordHit('early bird', 1);
@@ -88,20 +88,20 @@ describe('rate limiter tests', () => {
     expect(rateLimiter.getClearTime('partner in crime')).to.equal(11);
     expect(rateLimiter.getClearTime('latecomer')).to.equal(18);
 
-    rateLimiter.expireHits(10);
+    rateLimiter.expireHits(10, 5);
     expect(rateLimiter.debugCountTrackedAddresses()).to.deep.equal([3, 3]);
 
-    rateLimiter.expireHits(12);
+    rateLimiter.expireHits(12, 5);
     expect(rateLimiter.debugCountTrackedAddresses()).to.deep.equal([1, 1]);
 
-    rateLimiter.expireHits(19);
+    rateLimiter.expireHits(19, 5);
     expect(rateLimiter.debugCountTrackedAddresses()).to.deep.equal([0, 0]);
   });
 
   it('should keep its data structure sizes in sync, in the presence of identical timestamps', () => {
     // I noticed a bug in the tree multimap code so I realized we really need tests around it because the edge cases are obscure and perilous
 
-    const rateLimiter = new RateLimiter(2, 10);
+    const rateLimiter = new RateLimiter(2, 10, true);
     expect(rateLimiter.debugCountTrackedAddresses()).to.deep.equal([0, 0]);
 
     rateLimiter.recordHit('first', 1);
@@ -125,7 +125,7 @@ describe('rate limiter tests', () => {
 
   describe('expireOneHit', () => {
     it('should not cause problems when called on an empty rateLimiter', () => {
-      const rateLimiter = new RateLimiter(2, 10);
+      const rateLimiter = new RateLimiter(2, 10, true);
       expect(rateLimiter.debugCountTrackedAddresses()).to.deep.equal([0, 0]);
 
       const result = rateLimiter.expireOneHit();
@@ -134,7 +134,7 @@ describe('rate limiter tests', () => {
     });
 
     it('should erase the record that will expire soonest', () => {
-      const rateLimiter = new RateLimiter(2, 10);
+      const rateLimiter = new RateLimiter(2, 10, true);
       rateLimiter.recordHit('first', 1);
       rateLimiter.recordHit('second', 2);
       rateLimiter.recordHit('third', 3);

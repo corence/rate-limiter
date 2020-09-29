@@ -15,7 +15,7 @@ const server = http.createServer((req, res) => {
   const now = Date.now();
 
   // We expire hits in the database which are no longer relevant. Doing it on every recorded hit spreads the cost so we expect this to be quite quick.
-  rateLimiter.expireHits(now);
+  rateLimiter.expireHits(now, 8);
 
   // Record the new hit
   rateLimiter.recordHit(ipAddress, now);

@@ -19,27 +19,31 @@ function treeMultiMapErase(collection, key, value) {
 // Each client is identified by an "address", which is any valid hashmap key.
 class RateLimiter {
   // Constructor arguments:
-	//  TODO: docs
+  //
   //   hitsPerPeriod: the maximum number of hits that will be tolerated within each period.
   //     If a client exceeds this many hits per period, they'll eventually start being blocked.
-  //   period: the time period, in milliseconds, in which the "hitsPerPeriod" is considered tolerable.
+  //
+  //   periodInMilliseconds: the time period, in milliseconds, in which the "hitsPerPeriod" is considered tolerable.
+  //
+  //   countBlockedHits: whether blocked hits should contribute to further rate limiting.
+  //
   // Samples:
-  //   new RateLimiter(100, 3600 * 1000);
+  //   new RateLimiter(100, 3600 * 1000, true);
   //   This constructs a RateLimiter which restricts each client to 100 hits per hour.
   //   A client who sends 200 hits per hour will exceed the acceptable hit rate (and start being blocked) after half an hour.
   //   If that client immediately stops sending traffic, their ability to send hits will resume; their recorded hits will be fully cleared after one hour.
   //
-  //   new RateLimiter(10, 360 * 1000);
+  //   new RateLimiter(10, 360 * 1000, true);
   //   This takes hits at the same rate as the previous rate limiter, but it has a lower threshold before it starts blocking, so it's more aggressive.
   //   If a user sends over 10 packets in any six minute timespan, they'll trigger a block. The above rate limiter wouldn't do so.
   //
-  //   new RateLimiter(1, 10);
+  //   new RateLimiter(1, 10, true);
   //   This RateLimiter restricts its clients to one request per 10 milliseconds.
   //   If they send less than this, they'll never be blocked.
   //   If they send 100 hits in the first 10 milliseconds, most of them will be blocked, and they'd need to wait 90 milliseconds before their hits stop being ignored.
-  constructor(hitsPerPeriod, periodInSeconds, countBlockedHits) {
-    this.interval = period / hitsPerPeriod; // the maximum timespan between hits before the client risks getting blocked
-    this.period = period; // the time that must elapse for their recorded hits to fully dissipate
+  constructor(hitsPerPeriod, periodInMilliseconds, countBlockedHits) {
+    this.interval = periodInMilliseconds / hitsPerPeriod; // the maximum timespan between hits before the client risks getting blocked
+    this.periodInMilliseconds = periodInMilliseconds; // the time that must elapse for their recorded hits to fully dissipate
     this.countBlockedHits = countBlockedHits;
     
     // This tracks the "clear time" for each address. That is the time when all recorded activity by the address will dissipate to zero.
@@ -60,7 +64,7 @@ class RateLimiter {
     const clearTime = this.getClearTime(address);
     
     if(clearTime) {
-      return Math.max(0, clearTime - time - this.period);
+      return Math.max(0, clearTime - time - this.periodInMilliseconds);
     } else {
       return 0;
     }
@@ -94,9 +98,12 @@ class RateLimiter {
   }
 
   // At the given timestamp, erase all records whose clear time is in the past
+  // It won't clear more than maxNumberExpired hits; we limit it so that we don't risk a huge surge of hits being cleared at once.
   // Intended usage: this is generally useful to call just before each call to recordHit.
   // This amortizes the cost of the operation.
   // Worst-case time of this operation could be O(n * log(n)) where n is the number of entries expiring at once, but that would be a strange and degenerate case and it may be quite difficult for a hostile user to craft an attack based on this.
+  // Actually, n is the minimum of the number of expiring entries and maxNumberExpired.
+  // As long as maxNumberExpired is greater than 1, it'll eventually clear away all expired hits.
   expireHits(time, maxNumberExpired) {
     let numResults = 0;
     const end = this.clearTimesToAddresses.upperBound(time);
@@ -111,7 +118,7 @@ class RateLimiter {
       this.clearTimesToAddresses.erase(it);
       it = this.clearTimesToAddresses.begin();
       ++numResults;
-      // TODO: I couldn't find a way with this TreeMultiMap to erase an element and also advance the iterator to the following element.
+      // TODO: I couldn't find a way with this particular TreeMultiMap to erase an element and also advance the iterator to the following element.
       // We should be calling it.next(), but I couldn't figure out how, so we're calling it.begin().
       // This might be a mild performance issue but I guess it has the same hypothetical O(log(n)), and it's a red/black tree so
       // it's all going to be cache misses anyway.
